@@ -15,6 +15,7 @@ export class SocketController{
     static roomDataMap = new Map();
     static roomResponseMap = new Map();
     static roomVoteMap = new Map();
+    static roundMap = new Map();
     static init(io:Server){
         
         io.on("connection", (socket)=>{
@@ -89,11 +90,10 @@ export class SocketController{
                     connectedSockets = await socket.nsp.in(userInfo.room_id).fetchSockets();
 
                     // The additionaly condition is to prevent me removing user if the user is the only one that joins the server.
-                    if(room!.player_limit >= connectedSockets.length && connectedSockets.length > 1){
+                    if( (connectedSockets.length > room!.player_limit) && (connectedSockets.length > 1)){
                         // Room full but socket is the creater. I will kick out a random nobody..lol
                         if(room?.creator! == (userdata.id as unknown as ObjectId)){
                             let rand = Math.floor(Math.random()* connectedSockets.length);
-                            console.log("here")
                             connectedSockets[rand].leave(userInfo.room_id); //ah so unfortunate lol.
                         }else{
                             // emit to socket that they cannot connect
@@ -220,6 +220,13 @@ export class SocketController{
                     socket.emit("room_connect_error", "Action not permitted");
                 }
 
+                // sets round if doesn't exist if it does then updates it.
+                if(!this.roundMap.has(room.id)){
+                    this.roundMap.set(room.id, 1);
+                }else{
+                    let round = this.roundMap.get(room.id);
+                    this.roundMap.set(room.id, round + 1);
+                };
                 let userdata:TokenData = JSON.parse(atob(userInfo.data));
 
                 let connectedSockets = await socket.nsp.in(userInfo.room_id).fetchSockets();
@@ -375,14 +382,16 @@ export class SocketController{
                         socket.nsp.to(userInfo.room_id).emit("round_tally", {response: scoreTable});
                         // timeoutManager(socket, userInfo.room_id, 10, 1000, );
                          // The total amount of rounds for the room has ended.
-                        if(room?.round_limit! <= (socket.data as SocketData).user.current_round){
+                         let round = +this.roundMap.get(room?.id);
+                        if(room?.round_limit! <= round){
                             // Calculate the winner from the room then save the points to the user in the database. There can only be one user or none.
                             // If there is no highest score then noone will win no updates will be made to the respective users record.
+                            console.log("Game should be over round: ", round);
                             return timeoutManager(socket, userInfo.room_id, 15, 1000, {name :"Gameover", data:{}})
                         }
 
                         let connectedSockets = await socket.nsp.in(userInfo.room_id).fetchSockets();
-
+                        console.log("Current Round: ",(socket.data as SocketData).user.current_round)
                         SocketController.chooseDictator(connectedSockets);
                         timeoutManagerNewRound(socket, userInfo.room_id, 15, 1000, connectedSockets);
                         
