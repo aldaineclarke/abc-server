@@ -8,6 +8,7 @@ export interface IRoom{
     voting_duration: number;
     round_duration:number;
     gameFields: string[];
+    current_round: number;
     round_limit: number;
     status: number;
     privacy: number;

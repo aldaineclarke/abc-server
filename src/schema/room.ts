@@ -14,6 +14,7 @@ const roomSchema = new Schema<IRoom>({
     voting_duration: {type: Number, default:30},
     round_duration:{type: Number, default: 30},
     round_limit: {type:Number, default:10},
+    current_round: {type:Number, default: 0},
     gameFields: {type: [String], default: ["Girl Name", "Boy Name", "Animal", "Place", "Thing"]},
     status: {type: Number, enum: {values: statuskeys, message: `{VALUE} is not in ${statuskeys}`}, default:0},
     privacy: {type:Number, enum: {values: privacyKeys, message: `{VALUE} is not in ${privacyKeys}`}, default: 0},
