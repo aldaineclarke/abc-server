@@ -15,7 +15,7 @@ export class SocketController{
     static roomDataMap = new Map();
     static roomResponseMap = new Map();
     static roomVoteMap = new Map();
-    static roundMap = new Map();
+    static roundCountMap = new Map();
     static init(io:Server){
         
         io.on("connection", (socket)=>{
@@ -219,14 +219,13 @@ export class SocketController{
                 if(!(room?.status == StatusEnum.INPROGRESS) ){
                     socket.emit("room_connect_error", "Action not permitted");
                 }
-
-                // sets round if doesn't exist if it does then updates it.
-                if(!this.roundMap.has(room.id)){
-                    this.roundMap.set(room.id, 1);
+                if(!this.roundCountMap.has(room.id)){
+                    this.roundCountMap.set(room.id, {count: 0, round: 0})
                 }else{
-                    let round = this.roundMap.get(room.id);
-                    this.roundMap.set(room.id, round + 1);
-                };
+                    let roundCount: {count: number, round: number} = this.roundCountMap.get(room.id);
+                    this.roundCountMap.set(room.id, {count: roundCount.count + 1, round: roundCount.round })
+                }
+
                 let userdata:TokenData = JSON.parse(atob(userInfo.data));
 
                 let connectedSockets = await socket.nsp.in(userInfo.room_id).fetchSockets();
@@ -237,6 +236,12 @@ export class SocketController{
                 userdata.timeout = room?.round_duration!;
                 this.roomResponseMap.set(room._id,[] );
                 this.roomVoteMap.set(room?.id,[] );
+                
+                let roundCount: {count: number, round: number} = this.roundCountMap.get(room.id);
+
+                if(roundCount.count == connectedSockets.length){
+                    this.roundCountMap.set(room.id, {count: 0, round: roundCount.round + 1});
+                }
 
                 // emit to everyone in the room that they should stop after timeout
                 // let round_timeout = setTimeout(()=>{
@@ -382,11 +387,13 @@ export class SocketController{
                         socket.nsp.to(userInfo.room_id).emit("round_tally", {response: scoreTable});
                         // timeoutManager(socket, userInfo.room_id, 10, 1000, );
                          // The total amount of rounds for the room has ended.
-                         let round = +this.roundMap.get(room?.id);
-                        if(room?.round_limit! <= round){
+                         let roundCount: {count:number, round:number} = this.roundCountMap.get(room?.id);
+
+                        console.log("Current Round: ",room?.current_round);
+                        if(roundCount.round > room?.round_limit! ){
                             // Calculate the winner from the room then save the points to the user in the database. There can only be one user or none.
                             // If there is no highest score then noone will win no updates will be made to the respective users record.
-                            console.log("Game should be over round: ", round);
+                            console.log("Game should be over round: ", roundCount.round);
                             return timeoutManager(socket, userInfo.room_id, 15, 1000, {name :"Gameover", data:{}})
                         }
 
